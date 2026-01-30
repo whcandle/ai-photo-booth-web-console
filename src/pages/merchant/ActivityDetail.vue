@@ -4,14 +4,26 @@
     <div v-if="loading">Loading...</div>
     <div v-else>
       <div class="section">
-        <h2>Bind Templates</h2>
-        <div v-if="templates.length === 0">No templates available</div>
+        <h2>Bind Template Versions</h2>
+        <div v-if="templateVersionsLoading">Loading template versions...</div>
+        <div v-else-if="templateVersions.length === 0">No template versions available</div>
         <div v-else>
-          <div v-for="template in templates" :key="template.id" class="template-item">
-            <input type="checkbox" :value="template.id" v-model="selectedTemplates" />
-            <span>{{ template.name }}</span>
+          <div v-for="tv in templateVersions" :key="tv.templateVersionId" class="template-version-item">
+            <input 
+              type="checkbox" 
+              :value="tv.templateVersionId" 
+              v-model="selectedTemplateVersions" 
+            />
+            <span class="version-label">
+              <strong>{{ tv.templateName }}</strong> - v{{ tv.versionSemver }}
+            </span>
+            <span v-if="tv.coverUrl" class="cover-preview">
+              <img :src="tv.coverUrl" alt="Cover" class="cover-image" />
+            </span>
           </div>
-          <button @click="handleBindTemplates" :disabled="binding">Bind Selected</button>
+          <button @click="handleBindTemplateVersions" :disabled="binding">
+            Bind Selected Versions
+          </button>
         </div>
       </div>
       <div class="section">
@@ -33,8 +45,14 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../../store/auth'
-import { bindTemplatesToActivity, bindDevicesToActivity, getDevices } from '../../api/merchant'
-import { getTemplates } from '../../api/admin'
+import { 
+  bindTemplatesToActivity, 
+  bindDevicesToActivity, 
+  getDevices,
+  getTemplateVersions,
+  bindTemplateVersionsToActivity,
+  getActivityTemplateVersions
+} from '../../api/merchant'
 
 export default {
   name: 'ActivityDetail',
@@ -43,21 +61,47 @@ export default {
     const authStore = useAuthStore()
     const activityId = parseInt(route.params.id)
     const activity = ref(null)
-    const templates = ref([])
+    const templateVersions = ref([])
     const devices = ref([])
-    const selectedTemplates = ref([])
+    const selectedTemplateVersions = ref([])
     const selectedDevices = ref([])
     const loading = ref(false)
     const binding = ref(false)
+    const templateVersionsLoading = ref(false)
+    const boundVersionsLoading = ref(false)
 
-    const loadTemplates = async () => {
+    const loadTemplateVersions = async () => {
+      templateVersionsLoading.value = true
       try {
-        const response = await getTemplates()
+        const response = await getTemplateVersions()
         if (response.data.success) {
-          templates.value = response.data.data
+          templateVersions.value = response.data.data || []
+        } else {
+          console.error('Failed to load template versions:', response.data.message)
         }
       } catch (e) {
-        console.error('Failed to load templates', e)
+        console.error('Error loading template versions', e)
+      } finally {
+        templateVersionsLoading.value = false
+      }
+    }
+
+    // 加载当前活动已绑定的版本，用于回显勾选状态
+    const loadBoundTemplateVersions = async () => {
+      boundVersionsLoading.value = true
+      try {
+        const response = await getActivityTemplateVersions(activityId)
+        if (response.data.success) {
+          const ids = response.data.data || []
+          // 去重并设置为当前选中
+          selectedTemplateVersions.value = Array.from(new Set(ids))
+        } else {
+          console.error('Failed to load bound template versions:', response.data.message)
+        }
+      } catch (e) {
+        console.error('Error loading bound template versions', e)
+      } finally {
+        boundVersionsLoading.value = false
       }
     }
 
@@ -73,12 +117,19 @@ export default {
       }
     }
 
-    const handleBindTemplates = async () => {
+    const handleBindTemplateVersions = async () => {
+      if (selectedTemplateVersions.value.length === 0) {
+        alert('Please select at least one template version')
+        return
+      }
+      const uniqueIds = Array.from(new Set(selectedTemplateVersions.value))
       binding.value = true
       try {
-        const response = await bindTemplatesToActivity(activityId, selectedTemplates.value)
+        const response = await bindTemplateVersionsToActivity(activityId, uniqueIds)
         if (response.data.success) {
-          alert('Templates bound successfully')
+          alert('Template versions bound successfully')
+          // 重新加载已绑定状态，保持 UI 与后端一致
+          await loadBoundTemplateVersions()
         } else {
           alert('Failed: ' + response.data.message)
         }
@@ -105,20 +156,23 @@ export default {
       }
     }
 
-    onMounted(() => {
-      loadTemplates()
-      loadDevices()
+    onMounted(async () => {
+      await loadTemplateVersions()
+      await loadBoundTemplateVersions()
+      await loadDevices()
     })
 
     return {
       activity,
-      templates,
+      templateVersions,
+      templateVersionsLoading,
+      boundVersionsLoading,
       devices,
-      selectedTemplates,
+      selectedTemplateVersions,
       selectedDevices,
       loading,
       binding,
-      handleBindTemplates,
+      handleBindTemplateVersions,
       handleBindDevices
     }
   }
@@ -139,12 +193,36 @@ export default {
   border-radius: 4px;
 }
 
-.template-item,
+.template-version-item,
 .device-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.template-version-item:hover {
+  background-color: #f9f9f9;
+}
+
+.version-label {
+  flex: 1;
+}
+
+.cover-preview {
+  display: flex;
+  align-items: center;
+}
+
+.cover-image {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ddd;
 }
 
 button {
