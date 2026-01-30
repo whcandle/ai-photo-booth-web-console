@@ -4,6 +4,10 @@ export function getActivities(merchantId) {
   return http.get('/merchant/activities', { params: { merchantId } })
 }
 
+export function getActivity(activityId) {
+  return http.get(`/merchant/activities/${activityId}`)
+}
+
 export function createActivity(data) {
   return http.post('/merchant/activities', data)
 }
@@ -26,6 +30,10 @@ export function getActivityTemplateVersions(activityId) {
 
 export function bindDevicesToActivity(activityId, deviceIds) {
   return http.post(`/merchant/activities/${activityId}/devices`, { deviceIds })
+}
+
+export function getActivityDevices(activityId) {
+  return http.get(`/merchant/activities/${activityId}/devices`)
 }
 
 export function getDevices(merchantId) {

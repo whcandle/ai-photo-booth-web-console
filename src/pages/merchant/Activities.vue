@@ -21,12 +21,28 @@
         <h2>Create Activity</h2>
         <form @submit.prevent="handleCreate">
           <div class="form-group">
-            <label>Name</label>
+            <label>Name <span class="required">*</span></label>
             <input v-model="newActivity.name" required />
           </div>
           <div class="form-group">
             <label>Description</label>
             <textarea v-model="newActivity.description"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Start Time</label>
+            <input 
+              type="datetime-local" 
+              v-model="newActivity.startAt" 
+            />
+            <small class="form-hint">Optional: Leave empty if no start time needed</small>
+          </div>
+          <div class="form-group">
+            <label>End Time</label>
+            <input 
+              type="datetime-local" 
+              v-model="newActivity.endAt" 
+            />
+            <small class="form-hint">Optional: Leave empty if no end time needed</small>
           </div>
           <div class="form-actions">
             <button type="submit" :disabled="creating">Create</button>
@@ -54,7 +70,9 @@ export default {
     const creating = ref(false)
     const newActivity = ref({
       name: '',
-      description: ''
+      description: '',
+      startAt: '',
+      endAt: ''
     })
 
     const loadActivities = async () => {
@@ -79,14 +97,24 @@ export default {
     const handleCreate = async () => {
       creating.value = true
       try {
+        // 将 datetime-local 格式转换为 ISO 字符串，如果为空则传 null
+        const startAt = newActivity.value.startAt 
+          ? new Date(newActivity.value.startAt).toISOString() 
+          : null
+        const endAt = newActivity.value.endAt 
+          ? new Date(newActivity.value.endAt).toISOString() 
+          : null
+
         const response = await createActivity({
           merchantId: authStore.merchantId,
           name: newActivity.value.name,
-          description: newActivity.value.description
+          description: newActivity.value.description,
+          startAt: startAt,
+          endAt: endAt
         })
         if (response.data.success) {
           showCreateModal.value = false
-          newActivity.value = { name: '', description: '' }
+          newActivity.value = { name: '', description: '', startAt: '', endAt: '' }
           loadActivities()
         } else {
           error.value = response.data.message
@@ -180,6 +208,23 @@ export default {
   padding: 0.75rem;
   border: 1px solid #ddd;
   border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.form-group input[type="datetime-local"] {
+  font-family: inherit;
+}
+
+.required {
+  color: #e74c3c;
+}
+
+.form-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  color: #666;
+  font-style: italic;
 }
 
 .form-actions {

@@ -1,8 +1,37 @@
 <template>
   <div class="activity-detail">
-    <h1>{{ activity?.name || 'Activity Detail' }}</h1>
-    <div v-if="loading">Loading...</div>
-    <div v-else>
+    <div v-if="loading" class="loading">Loading activity...</div>
+    <div v-else-if="activity">
+      <div class="activity-header">
+        <h1>{{ activity.name }}</h1>
+        <div class="activity-info">
+          <div class="info-item">
+            <span class="info-label">活动编号:</span>
+            <span class="info-value">#{{ activity.id }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">状态:</span>
+            <span class="info-value status-badge" :class="'status-' + activity.status.toLowerCase()">
+              {{ activity.status }}
+            </span>
+          </div>
+          <div v-if="activity.description" class="info-item">
+            <span class="info-label">描述:</span>
+            <span class="info-value">{{ activity.description }}</span>
+          </div>
+          <div v-if="activity.startAt" class="info-item">
+            <span class="info-label">开始时间:</span>
+            <span class="info-value">{{ formatDateTime(activity.startAt) }}</span>
+          </div>
+          <div v-if="activity.endAt" class="info-item">
+            <span class="info-label">结束时间:</span>
+            <span class="info-value">{{ formatDateTime(activity.endAt) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-else class="error">Activity not found</div>
+    <div v-if="!loading && activity">
       <div class="section">
         <h2>Bind Template Versions</h2>
         <div v-if="templateVersionsLoading">Loading template versions...</div>
@@ -51,7 +80,9 @@ import {
   getDevices,
   getTemplateVersions,
   bindTemplateVersionsToActivity,
-  getActivityTemplateVersions
+  getActivityTemplateVersions,
+  getActivityDevices,
+  getActivity
 } from '../../api/merchant'
 
 export default {
@@ -69,6 +100,35 @@ export default {
     const binding = ref(false)
     const templateVersionsLoading = ref(false)
     const boundVersionsLoading = ref(false)
+    const boundDevicesLoading = ref(false)
+
+    const loadActivity = async () => {
+      loading.value = true
+      try {
+        const response = await getActivity(activityId)
+        if (response.data.success) {
+          activity.value = response.data.data
+        } else {
+          console.error('Failed to load activity:', response.data.message)
+        }
+      } catch (e) {
+        console.error('Error loading activity', e)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const formatDateTime = (dateTime) => {
+      if (!dateTime) return ''
+      const date = new Date(dateTime)
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
 
     const loadTemplateVersions = async () => {
       templateVersionsLoading.value = true
@@ -117,6 +177,25 @@ export default {
       }
     }
 
+    // 加载当前活动已绑定的设备，用于回显勾选状态
+    const loadBoundDevices = async () => {
+      boundDevicesLoading.value = true
+      try {
+        const response = await getActivityDevices(activityId)
+        if (response.data.success) {
+          const ids = response.data.data || []
+          // 去重并设置为当前选中
+          selectedDevices.value = Array.from(new Set(ids))
+        } else {
+          console.error('Failed to load bound devices:', response.data.message)
+        }
+      } catch (e) {
+        console.error('Error loading bound devices', e)
+      } finally {
+        boundDevicesLoading.value = false
+      }
+    }
+
     const handleBindTemplateVersions = async () => {
       if (selectedTemplateVersions.value.length === 0) {
         alert('Please select at least one template version')
@@ -141,11 +220,18 @@ export default {
     }
 
     const handleBindDevices = async () => {
+      if (selectedDevices.value.length === 0) {
+        alert('Please select at least one device')
+        return
+      }
+      const uniqueIds = Array.from(new Set(selectedDevices.value))
       binding.value = true
       try {
-        const response = await bindDevicesToActivity(activityId, selectedDevices.value)
+        const response = await bindDevicesToActivity(activityId, uniqueIds)
         if (response.data.success) {
           alert('Devices bound successfully')
+          // 重新加载已绑定状态，保持 UI 与后端一致
+          await loadBoundDevices()
         } else {
           alert('Failed: ' + response.data.message)
         }
@@ -157,9 +243,11 @@ export default {
     }
 
     onMounted(async () => {
+      await loadActivity()
       await loadTemplateVersions()
       await loadBoundTemplateVersions()
       await loadDevices()
+      await loadBoundDevices()
     })
 
     return {
@@ -167,11 +255,13 @@ export default {
       templateVersions,
       templateVersionsLoading,
       boundVersionsLoading,
+      boundDevicesLoading,
       devices,
       selectedTemplateVersions,
       selectedDevices,
       loading,
       binding,
+      formatDateTime,
       handleBindTemplateVersions,
       handleBindDevices
     }
@@ -184,6 +274,73 @@ export default {
   background: white;
   padding: 2rem;
   border-radius: 8px;
+}
+
+.loading, .error {
+  padding: 2rem;
+  text-align: center;
+  color: #666;
+}
+
+.error {
+  color: #e74c3c;
+}
+
+.activity-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid #eee;
+}
+
+.activity-header h1 {
+  margin: 0 0 1rem 0;
+  font-size: 1.75rem;
+  color: #333;
+}
+
+.activity-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.info-label {
+  font-weight: 500;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.info-value {
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.status-badge.status-active {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.status-inactive {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-badge.status-draft {
+  background: #fff3cd;
+  color: #856404;
 }
 
 .section {
