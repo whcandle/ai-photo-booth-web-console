@@ -34,9 +34,13 @@
     <div v-if="!loading && activity">
       <div class="section">
         <h2>Bind Template Versions</h2>
+        <div v-if="boundVersionsLoading" class="loading-hint">Loading bound versions...</div>
         <div v-if="templateVersionsLoading">Loading template versions...</div>
         <div v-else-if="templateVersions.length === 0">No template versions available</div>
         <div v-else>
+          <div class="selection-info">
+            <span>Selected: {{ selectedTemplateVersions.length }} / {{ templateVersions.length }}</span>
+          </div>
           <div v-for="tv in templateVersions" :key="tv.templateVersionId" class="template-version-item">
             <input 
               type="checkbox" 
@@ -50,9 +54,19 @@
               <img :src="tv.coverUrl" alt="Cover" class="cover-image" />
             </span>
           </div>
-          <button @click="handleBindTemplateVersions" :disabled="binding">
-            Bind Selected Versions
-          </button>
+          <div class="bind-actions">
+            <button @click="handleBindTemplateVersions" :disabled="binding || boundVersionsLoading">
+              {{ binding ? 'Binding...' : 'Bind Selected Versions' }}
+            </button>
+            <button 
+              v-if="selectedTemplateVersions.length > 0" 
+              @click="selectedTemplateVersions = []" 
+              :disabled="binding || boundVersionsLoading"
+              class="btn-secondary"
+            >
+              Clear Selection
+            </button>
+          </div>
         </div>
       </div>
       <div class="section">
@@ -147,19 +161,23 @@ export default {
     }
 
     // 加载当前活动已绑定的版本，用于回显勾选状态
+    // 调用 GET /api/v1/merchant/activities/{id}/template-versions 获取详细信息列表
     const loadBoundTemplateVersions = async () => {
       boundVersionsLoading.value = true
       try {
         const response = await getActivityTemplateVersions(activityId)
         if (response.data.success) {
-          const ids = response.data.data || []
-          // 去重并设置为当前选中
+          const boundVersions = response.data.data || []
+          // 从详细信息列表中提取 templateVersionId，并设置为当前选中
+          const ids = boundVersions.map(item => item.templateVersionId).filter(id => id != null)
           selectedTemplateVersions.value = Array.from(new Set(ids))
         } else {
           console.error('Failed to load bound template versions:', response.data.message)
+          selectedTemplateVersions.value = []
         }
       } catch (e) {
         console.error('Error loading bound template versions', e)
+        selectedTemplateVersions.value = []
       } finally {
         boundVersionsLoading.value = false
       }
@@ -197,10 +215,7 @@ export default {
     }
 
     const handleBindTemplateVersions = async () => {
-      if (selectedTemplateVersions.value.length === 0) {
-        alert('Please select at least one template version')
-        return
-      }
+      // 全量覆盖语义：提交当前勾选的全量 templateVersionIds（包括空数组）
       const uniqueIds = Array.from(new Set(selectedTemplateVersions.value))
       binding.value = true
       try {
@@ -382,18 +397,48 @@ export default {
   border: 1px solid #ddd;
 }
 
-button {
+.selection-info {
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.bind-actions {
   margin-top: 1rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+button {
   padding: 0.75rem 1.5rem;
   background: #667eea;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 0.95rem;
 }
 
 button:disabled {
   background: #ccc;
   cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #6c757d;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #5a6268;
+}
+
+.loading-hint {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #666;
+  font-style: italic;
 }
 </style>

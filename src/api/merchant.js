@@ -1,7 +1,8 @@
 import http from './http'
 
-export function getActivities(merchantId) {
-  return http.get('/merchant/activities', { params: { merchantId } })
+export function getActivities(merchantId, params = {}) {
+  const queryParams = { merchantId, ...params }
+  return http.get('/merchant/activities', { params: queryParams })
 }
 
 export function getActivity(activityId) {
