@@ -59,6 +59,21 @@ const routes = [
         path: 'merchants',
         name: 'AdminMerchants',
         component: () => import('../pages/admin/Merchants.vue')
+      },
+      {
+        path: 'providers',
+        name: 'AdminProviders',
+        component: () => import('../pages/admin/Providers.vue')
+      },
+      {
+        path: 'providers/:id',
+        name: 'AdminProviderDetail',
+        component: () => import('../pages/admin/ProviderDetail.vue')
+      },
+      {
+        path: 'routing-policies',
+        name: 'AdminRoutingPolicies',
+        component: () => import('../pages/admin/RoutingPolicies.vue')
       }
     ]
   },
