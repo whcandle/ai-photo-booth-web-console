@@ -47,6 +47,11 @@
             </el-table-column>
             <el-table-column prop="priority" label="Priority" width="100" />
             <el-table-column prop="defaultTimeoutMs" label="Timeout (ms)" width="120" />
+            <el-table-column prop="constraints" label="Constraints" width="200">
+              <template #default="{ row }">
+                <span class="constraints-summary" v-html="formatConstraints(row)"></span>
+              </template>
+            </el-table-column>
             <el-table-column prop="defaultParamsJson" label="Default Params" min-width="200">
               <template #default="{ row }">
                 <pre class="json-preview">{{ formatJson(row.defaultParamsJson) }}</pre>
@@ -180,6 +185,65 @@
             Must be valid JSON format
           </div>
         </el-form-item>
+
+        <el-divider>
+          <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #303133;">Input Constraints</h3>
+        </el-divider>
+
+        <el-form-item label="Max Bytes (MB)" prop="inputMaxBytesMb">
+          <el-input-number
+            v-model="currentCapability.inputMaxBytesMb"
+            :precision="2"
+            :step="0.1"
+            :min="0"
+            placeholder="10"
+            style="width: 100%"
+          />
+        </el-form-item>
+
+        <el-form-item label="Max Side (px)" prop="inputMaxSide">
+          <el-input-number
+            v-model="currentCapability.inputMaxSide"
+            :min="0"
+            placeholder="4096"
+            style="width: 100%"
+          />
+        </el-form-item>
+
+        <el-form-item label="Max Pixels (MP)" prop="inputMaxPixelsMp">
+          <el-input-number
+            v-model="currentCapability.inputMaxPixelsMp"
+            :precision="2"
+            :step="0.1"
+            :min="0"
+            placeholder="12"
+            style="width: 100%"
+          />
+        </el-form-item>
+
+        <el-form-item label="Accept Formats">
+          <el-select
+            v-model="currentCapability.acceptFormatsArr"
+            multiple
+            placeholder="Select formats"
+            style="width: 100%"
+          >
+            <el-option label="jpeg" value="jpeg" />
+            <el-option label="jpg" value="jpg" />
+            <el-option label="png" value="png" />
+            <el-option label="webp" value="webp" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="Default Quality (1-100)" prop="defaultQuality">
+          <el-input-number
+            v-model="currentCapability.defaultQuality"
+            :min="1"
+            :max="100"
+            placeholder="85"
+            style="width: 100%"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -283,7 +347,12 @@ export default {
       status: 'ACTIVE',
       priority: 0,
       defaultTimeoutMs: 30000,
-      defaultParamsJson: '{}'
+      defaultParamsJson: '{}',
+      inputMaxBytesMb: null,
+      inputMaxSide: null,
+      inputMaxPixelsMp: null,
+      acceptFormatsArr: [],
+      defaultQuality: null
     })
 
     // Keys
@@ -298,6 +367,18 @@ export default {
     })
 
     const activeTab = ref('capabilities')
+
+    // 工具函数：安全 JSON 解析
+    const safeJsonParse = (s, fallback) => {
+      if (!s || (typeof s === 'string' && s.trim() === '')) {
+        return fallback
+      }
+      try {
+        return JSON.parse(s)
+      } catch (e) {
+        return fallback
+      }
+    }
 
     // 表单验证规则
     const capabilityRules = {
@@ -326,6 +407,70 @@ export default {
             } catch (e) {
               callback(new Error('Invalid JSON format'))
             }
+          },
+          trigger: 'blur'
+        }
+      ],
+      inputMaxBytesMb: [
+        {
+          validator: (rule, value, callback) => {
+            if (value == null || value === '') {
+              callback()
+              return
+            }
+            if (value <= 0) {
+              callback(new Error('Max Bytes must be greater than 0'))
+              return
+            }
+            callback()
+          },
+          trigger: 'blur'
+        }
+      ],
+      inputMaxSide: [
+        {
+          validator: (rule, value, callback) => {
+            if (value == null || value === '') {
+              callback()
+              return
+            }
+            if (value <= 0) {
+              callback(new Error('Max Side must be greater than 0'))
+              return
+            }
+            callback()
+          },
+          trigger: 'blur'
+        }
+      ],
+      inputMaxPixelsMp: [
+        {
+          validator: (rule, value, callback) => {
+            if (value == null || value === '') {
+              callback()
+              return
+            }
+            if (value <= 0) {
+              callback(new Error('Max Pixels must be greater than 0'))
+              return
+            }
+            callback()
+          },
+          trigger: 'blur'
+        }
+      ],
+      defaultQuality: [
+        {
+          validator: (rule, value, callback) => {
+            if (value == null || value === '') {
+              callback()
+              return
+            }
+            if (value < 1 || value > 100) {
+              callback(new Error('Default Quality must be between 1 and 100'))
+              return
+            }
+            callback()
           },
           trigger: 'blur'
         }
@@ -416,6 +561,11 @@ export default {
       currentCapability.priority = 0
       currentCapability.defaultTimeoutMs = 30000
       currentCapability.defaultParamsJson = '{}'
+      currentCapability.inputMaxBytesMb = null
+      currentCapability.inputMaxSide = null
+      currentCapability.inputMaxPixelsMp = null
+      currentCapability.acceptFormatsArr = []
+      currentCapability.defaultQuality = null
       capabilityDialogVisible.value = true
     }
 
@@ -445,6 +595,41 @@ export default {
       } else {
         currentCapability.defaultParamsJson = '{}'
       }
+
+      // 回显 Input Constraints 字段
+      // inputMaxBytesMb: bytes -> MB，保留 2 位小数
+      if (row.inputMaxBytes != null && row.inputMaxBytes !== undefined) {
+        currentCapability.inputMaxBytesMb = Math.round((row.inputMaxBytes / 1024 / 1024) * 100) / 100
+      } else {
+        currentCapability.inputMaxBytesMb = null
+      }
+
+      // inputMaxPixelsMp: pixels -> MP，保留 2 位小数
+      if (row.inputMaxPixels != null && row.inputMaxPixels !== undefined) {
+        currentCapability.inputMaxPixelsMp = Math.round((row.inputMaxPixels / 1_000_000) * 100) / 100
+      } else {
+        currentCapability.inputMaxPixelsMp = null
+      }
+
+      // inputMaxSide: 直接回显
+      currentCapability.inputMaxSide = row.inputMaxSide || null
+
+      // defaultQuality: 直接回显
+      currentCapability.defaultQuality = row.defaultQuality || null
+
+      // acceptFormatsArr: 解析 JSON 字符串或直接使用数组
+      if (row.acceptFormats) {
+        if (typeof row.acceptFormats === 'string') {
+          currentCapability.acceptFormatsArr = safeJsonParse(row.acceptFormats, [])
+        } else if (Array.isArray(row.acceptFormats)) {
+          currentCapability.acceptFormatsArr = row.acceptFormats
+        } else {
+          currentCapability.acceptFormatsArr = []
+        }
+      } else {
+        currentCapability.acceptFormatsArr = []
+      }
+
       capabilityDialogVisible.value = true
     }
 
@@ -487,6 +672,32 @@ export default {
             priority: currentCapability.priority,
             defaultTimeoutMs: currentCapability.defaultTimeoutMs,
             defaultParamsJson: defaultParamsJsonValue
+          }
+
+          // 转换并添加 Input Constraints 字段
+          // inputMaxBytes: MB -> bytes
+          if (currentCapability.inputMaxBytesMb != null && currentCapability.inputMaxBytesMb !== '') {
+            data.inputMaxBytes = Math.round(currentCapability.inputMaxBytesMb * 1024 * 1024)
+          }
+
+          // inputMaxSide: 直接传数值（如果非空）
+          if (currentCapability.inputMaxSide != null && currentCapability.inputMaxSide !== '') {
+            data.inputMaxSide = currentCapability.inputMaxSide
+          }
+
+          // inputMaxPixels: MP -> pixels
+          if (currentCapability.inputMaxPixelsMp != null && currentCapability.inputMaxPixelsMp !== '') {
+            data.inputMaxPixels = Math.round(currentCapability.inputMaxPixelsMp * 1000000)
+          }
+
+          // acceptFormats: 数组 -> JSON 字符串
+          if (currentCapability.acceptFormatsArr && currentCapability.acceptFormatsArr.length > 0) {
+            data.acceptFormats = JSON.stringify(currentCapability.acceptFormatsArr)
+          }
+
+          // defaultQuality: 直接传数值（如果非空）
+          if (currentCapability.defaultQuality != null && currentCapability.defaultQuality !== '') {
+            data.defaultQuality = currentCapability.defaultQuality
           }
 
           let response
@@ -622,6 +833,57 @@ export default {
       return JSON.stringify(json, null, 2)
     }
 
+    const formatConstraints = (row) => {
+      const parts = []
+
+      // bytes -> MB（保留 1 位小数）
+      if (row.inputMaxBytes != null && row.inputMaxBytes !== undefined) {
+        const mb = Math.round((row.inputMaxBytes / 1024 / 1024) * 10) / 10
+        parts.push(`${mb}MB`)
+      } else {
+        parts.push('<span class="muted">-</span>')
+      }
+
+      // maxSide
+      if (row.inputMaxSide != null && row.inputMaxSide !== undefined) {
+        parts.push(`${row.inputMaxSide}px`)
+      } else {
+        parts.push('<span class="muted">-</span>')
+      }
+
+      // pixels -> MP（保留 1 位小数）
+      if (row.inputMaxPixels != null && row.inputMaxPixels !== undefined) {
+        const mp = Math.round((row.inputMaxPixels / 1_000_000) * 10) / 10
+        parts.push(`${mp}MP`)
+      } else {
+        parts.push('<span class="muted">-</span>')
+      }
+
+      // formats: 如果是 JSON string 则 parse 后 join
+      let formats = []
+      if (row.acceptFormats) {
+        if (typeof row.acceptFormats === 'string') {
+          formats = safeJsonParse(row.acceptFormats, [])
+        } else if (Array.isArray(row.acceptFormats)) {
+          formats = row.acceptFormats
+        }
+      }
+      if (formats.length > 0) {
+        parts.push(formats.join('/'))
+      } else {
+        parts.push('<span class="muted">-</span>')
+      }
+
+      // quality
+      if (row.defaultQuality != null && row.defaultQuality !== undefined) {
+        parts.push(`q${row.defaultQuality}`)
+      } else {
+        parts.push('<span class="muted">-</span>')
+      }
+
+      return parts.join(' | ')
+    }
+
     const goBack = () => {
       router.push('/admin/providers')
     }
@@ -663,6 +925,7 @@ export default {
       handleKeyDialogClose,
       formatDate,
       formatJson,
+      formatConstraints,
       goBack
     }
   }
@@ -757,5 +1020,16 @@ export default {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.constraints-summary {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.constraints-summary .muted {
+  color: #909399;
 }
 </style>
