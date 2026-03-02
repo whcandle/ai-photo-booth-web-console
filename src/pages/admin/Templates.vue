@@ -74,6 +74,14 @@
               <option value="VIDEO">VIDEO</option>
             </select>
           </div>
+          <div class="form-group">
+            <label>Designer Type</label>
+            <select v-model="newTemplate.designerType">
+              <option value="GENERIC_V1">GENERIC_V1</option>
+              <option value="ID_PHOTO_V1">ID_PHOTO_V1</option>
+              <option value="STYLE_PORTRAIT_V1">STYLE_PORTRAIT_V1</option>
+            </select>
+          </div>
           <div class="form-actions">
             <button type="submit" :disabled="creating">Create</button>
             <button type="button" @click="showCreateModal = false">Cancel</button>
@@ -103,6 +111,7 @@ export default {
       name: '',
       description: '',
       type: 'IMAGE',
+      designerType: 'GENERIC_V1',
       contentJson: '{}'
     })
 
@@ -173,7 +182,7 @@ export default {
         const response = await createTemplate(newTemplate.value)
         if (response.data.success) {
           showCreateModal.value = false
-          newTemplate.value = { code: '', name: '', description: '', type: 'IMAGE', contentJson: '{}' }
+          newTemplate.value = { code: '', name: '', description: '', type: 'IMAGE', designerType: 'GENERIC_V1', contentJson: '{}' }
           loadTemplates()
         }
       } catch (e) {

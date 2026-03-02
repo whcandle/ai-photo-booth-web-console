@@ -17,6 +17,9 @@
         <el-menu-item index="/admin/templates">
           <span>Templates</span>
         </el-menu-item>
+        <el-menu-item index="/admin/designer">
+          <span>Template Designer</span>
+        </el-menu-item>
         <el-menu-item index="/admin/merchants">
           <span>Merchants</span>
         </el-menu-item>
@@ -68,6 +71,7 @@ export default {
     const menuItems = [
       { path: '/admin/dashboard', label: 'Dashboard' },
       { path: '/admin/templates', label: 'Templates' },
+      { path: '/admin/designer', label: 'Template Designer' },
       { path: '/admin/merchants', label: 'Merchants' },
       { path: '/admin/providers', label: 'Providers' },
       { path: '/admin/routing-policies', label: 'Routing Policies' }
@@ -79,6 +83,10 @@ export default {
       // 如果当前路径是 /admin/templates/:id，高亮 Templates 菜单
       if (currentPath.startsWith('/admin/templates')) {
         return '/admin/templates'
+      }
+      // 如果当前路径是 /admin/designer，高亮 Template Designer 菜单
+      if (currentPath.startsWith('/admin/designer')) {
+        return '/admin/designer'
       }
       // 如果当前路径是 /admin/providers/:id，高亮 Providers 菜单
       if (currentPath.startsWith('/admin/providers')) {

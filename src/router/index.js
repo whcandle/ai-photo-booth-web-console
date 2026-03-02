@@ -56,6 +56,16 @@ const routes = [
         component: () => import('../pages/admin/TemplateEditor.vue')
       },
       {
+        path: 'designer',
+        name: 'AdminDesigner',
+        component: () => import('../pages/admin/Designer.vue')
+      },
+      {
+        path: 'designer/:designerType/:templateId/:versionId',
+        name: 'AdminDesignerEditor',
+        component: () => import('../pages/admin/DesignerEditor.vue')
+      },
+      {
         path: 'merchants',
         name: 'AdminMerchants',
         component: () => import('../pages/admin/Merchants.vue')

@@ -41,3 +41,29 @@ export function deleteTemplateVersion(templateId, versionId) {
 export function activateTemplateVersion(templateId, versionId) {
   return http.post(`/admin/templates/${templateId}/versions/${versionId}/activate`)
 }
+
+// Template Designer APIs
+
+export function createDraft(data) {
+  return http.post('/admin/designer/drafts', data)
+}
+
+export function updateDraft(draftId, data) {
+  return http.put(`/admin/designer/drafts/${draftId}`, data)
+}
+
+export function previewDraft(draftId) {
+  return http.post(`/admin/designer/drafts/${draftId}/preview`)
+}
+
+export function publishDraft(draftId, data) {
+  return http.post(`/admin/designer/drafts/${draftId}/publish`, data)
+}
+
+export function uploadDraftAsset(draftId, file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return http.post(`/admin/designer/drafts/${draftId}/assets`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
