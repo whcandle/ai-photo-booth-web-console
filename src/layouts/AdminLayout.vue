@@ -1,10 +1,12 @@
 <template>
   <el-container class="admin-layout">
     <!-- 左侧菜单 -->
-    <el-aside width="250px" class="sidebar">
-      <div class="logo">AI Photo Booth</div>
+    <el-aside :width="collapsed ? '64px' : '250px'" class="sidebar" :class="{ collapsed }">
+      <div class="logo">{{ collapsed ? 'APB' : 'AI Photo Booth' }}</div>
       <el-menu
         :default-active="activeMenu"
+        :collapse="collapsed"
+        :collapse-transition="false"
         router
         class="admin-menu"
         background-color="#2c3e50"
@@ -12,23 +14,56 @@
         active-text-color="#409EFF"
       >
         <el-menu-item index="/admin/dashboard">
-          <span>Dashboard</span>
+          <el-icon><House /></el-icon>
+          <template #title><span>{{ t('menu.dashboard') }}</span></template>
         </el-menu-item>
-        <el-menu-item index="/admin/templates">
-          <span>Templates</span>
-        </el-menu-item>
-        <el-menu-item index="/admin/designer">
-          <span>Template Designer</span>
-        </el-menu-item>
-        <el-menu-item index="/admin/merchants">
-          <span>Merchants</span>
-        </el-menu-item>
-        <el-menu-item index="/admin/providers">
-          <span>Providers</span>
-        </el-menu-item>
-        <el-menu-item index="/admin/routing-policies">
-          <span>Routing Policies</span>
-        </el-menu-item>
+        <el-sub-menu index="admin-merchant-mgmt">
+          <template #title>
+            <el-icon><OfficeBuilding /></el-icon>
+            <span v-if="!collapsed">{{ t('menu.merchantGroup') }}</span>
+          </template>
+          <el-menu-item index="/admin/merchants">{{ t('menu.merchantList') }}</el-menu-item>
+          <el-menu-item index="/admin/merchants/owners">{{ t('menu.merchantOwners') }}</el-menu-item>
+          <el-menu-item index="/admin/merchants/staff">{{ t('menu.merchantStaff') }}</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu index="admin-operations">
+          <template #title>
+            <el-icon><Monitor /></el-icon>
+            <span v-if="!collapsed">{{ t('menu.operationGroup') }}</span>
+          </template>
+          <el-menu-item index="/admin/merchants/activities">{{ t('menu.merchantActivitySupervision') }}</el-menu-item>
+          <el-menu-item index="/admin/devices">{{ t('menu.merchantDeviceOwnership') }}</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu index="admin-finance">
+          <template #title>
+            <el-icon><Wallet /></el-icon>
+            <span v-if="!collapsed">{{ t('menu.financeGroup') }}</span>
+          </template>
+          <el-menu-item index="/admin/system/membership-plans">{{ t('menu.membershipPlans') }}</el-menu-item>
+          <el-menu-item index="/admin/system/pricing-rules">{{ t('menu.pricingRules') }}</el-menu-item>
+          <el-menu-item index="/admin/merchants/subscriptions">{{ t('menu.merchantSubscriptions') }}</el-menu-item>
+          <el-menu-item index="/admin/merchants/payments">{{ t('menu.merchantPayments') }}</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu index="admin-resources">
+          <template #title>
+            <el-icon><FolderOpened /></el-icon>
+            <span v-if="!collapsed">{{ t('menu.resourceGroup') }}</span>
+          </template>
+          <el-menu-item index="/admin/template-types">{{ t('menu.templateTypes') }}</el-menu-item>
+          <el-menu-item index="/admin/templates">{{ t('menu.templates') }}</el-menu-item>
+          <el-menu-item index="/admin/designer">{{ t('menu.templateDesigner') }}</el-menu-item>
+          <el-menu-item index="/admin/providers">{{ t('menu.providers') }}</el-menu-item>
+          <el-menu-item index="/admin/routing-policies">{{ t('menu.routingPolicies') }}</el-menu-item>
+        </el-sub-menu>
+        <el-sub-menu index="admin-system">
+          <template #title>
+            <el-icon><Setting /></el-icon>
+            <span v-if="!collapsed">{{ t('menu.systemGroup') }}</span>
+          </template>
+          <el-menu-item index="/admin/system/users">{{ t('menu.userManagement') }}</el-menu-item>
+          <el-menu-item index="/admin/system/roles">{{ t('menu.roleManagement') }}</el-menu-item>
+          <el-menu-item index="/admin/system/menus">{{ t('menu.menuPermissionManagement') }}</el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-aside>
 
@@ -37,11 +72,30 @@
       <!-- 顶部栏 -->
       <el-header class="header">
         <div class="header-content">
-          <div class="header-title">Admin Console</div>
+          <div class="header-title-wrap">
+            <el-tooltip :content="collapsed ? t('common.expand') : t('common.collapse')" placement="bottom">
+              <el-button text class="collapse-btn" @click="toggleSidebar">
+                <el-icon>
+                  <Expand v-if="collapsed" />
+                  <Fold v-else />
+                </el-icon>
+              </el-button>
+            </el-tooltip>
+            <div class="header-title">{{ t('layout.adminConsole') }}</div>
+          </div>
           <div class="header-actions">
+            <el-select
+              v-model="locale"
+              size="small"
+              style="width: 130px"
+              @change="onLocaleChange"
+            >
+              <el-option value="zh-CN" :label="t('common.chinese')" />
+              <el-option value="en-US" :label="t('common.english')" />
+            </el-select>
             <span class="user-name">{{ displayName }}</span>
             <el-button type="danger" size="small" @click="handleLogout">
-              Logout
+              {{ t('layout.logout') }}
             </el-button>
           </div>
         </div>
@@ -56,31 +110,40 @@
 </template>
 
 <script>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
+import { useI18n } from 'vue-i18n'
+import { setLocale } from '../i18n'
+import { Expand, Fold, FolderOpened, House, Monitor, OfficeBuilding, Setting, Wallet } from '@element-plus/icons-vue'
 
 export default {
   name: 'AdminLayout',
+  components: {
+    Expand,
+    Fold,
+    FolderOpened,
+    House,
+    Monitor,
+    OfficeBuilding,
+    Setting,
+    Wallet
+  },
   setup() {
+    const SIDEBAR_COLLAPSED_KEY = 'sidebar_collapsed'
     const route = useRoute()
     const router = useRouter()
     const authStore = useAuthStore()
-    
-    // 菜单配置：菜单项与路由路径对应
-    const menuItems = [
-      { path: '/admin/dashboard', label: 'Dashboard' },
-      { path: '/admin/templates', label: 'Templates' },
-      { path: '/admin/designer', label: 'Template Designer' },
-      { path: '/admin/merchants', label: 'Merchants' },
-      { path: '/admin/providers', label: 'Providers' },
-      { path: '/admin/routing-policies', label: 'Routing Policies' }
-    ]
+    const { t, locale } = useI18n()
+    const collapsed = ref(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1')
     
     // 根据当前路由自动高亮对应菜单项
     const activeMenu = computed(() => {
       const currentPath = route.path
       // 如果当前路径是 /admin/templates/:id，高亮 Templates 菜单
+      if (currentPath.startsWith('/admin/template-types')) {
+        return '/admin/template-types'
+      }
       if (currentPath.startsWith('/admin/templates')) {
         return '/admin/templates'
       }
@@ -96,6 +159,51 @@ export default {
       if (currentPath.startsWith('/admin/routing-policies')) {
         return '/admin/routing-policies'
       }
+      if (currentPath.startsWith('/admin/merchants/owners')) {
+        return '/admin/merchants/owners'
+      }
+      if (currentPath.startsWith('/admin/merchants/staff')) {
+        return '/admin/merchants/staff'
+      }
+      if (currentPath.startsWith('/admin/merchants/activities')) {
+        return '/admin/merchants/activities'
+      }
+      if (/^\/admin\/merchants\/\d+\/activities/.test(currentPath)) {
+        return '/admin/merchants/activities'
+      }
+      if (currentPath.startsWith('/admin/devices')) {
+        return '/admin/devices'
+      }
+      if (currentPath.startsWith('/admin/merchants/payments')) {
+        return '/admin/merchants/payments'
+      }
+      if (currentPath.startsWith('/admin/merchants/subscriptions')) {
+        return '/admin/merchants/subscriptions'
+      }
+      if (/^\/admin\/merchants\/\d+\/subscriptions/.test(currentPath)) {
+        return '/admin/merchants/subscriptions'
+      }
+      if (/^\/admin\/merchants\/\d+\/payments/.test(currentPath)) {
+        return '/admin/merchants/payments'
+      }
+      if (currentPath.startsWith('/admin/merchants')) {
+        return '/admin/merchants'
+      }
+      if (currentPath.startsWith('/admin/system/pricing-rules')) {
+        return '/admin/system/pricing-rules'
+      }
+      if (currentPath.startsWith('/admin/system/users')) {
+        return '/admin/system/users'
+      }
+      if (currentPath.startsWith('/admin/system/roles')) {
+        return '/admin/system/roles'
+      }
+      if (currentPath.startsWith('/admin/system/menus')) {
+        return '/admin/system/menus'
+      }
+      if (currentPath.startsWith('/admin/system/membership-plans')) {
+        return '/admin/system/membership-plans'
+      }
       // 其他情况直接使用当前路径
       return currentPath
     })
@@ -106,12 +214,31 @@ export default {
       authStore.logout()
       router.push('/login')
     }
+
+    const onLocaleChange = (value) => {
+      setLocale(value)
+    }
+
+    const toggleSidebar = () => {
+      collapsed.value = !collapsed.value
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed.value ? '1' : '0')
+    }
     
+    onMounted(() => {
+      if (authStore.role === 'ADMIN') {
+        authStore.fetchPermissions()
+      }
+    })
+
     return {
-      menuItems,
       activeMenu,
       displayName,
-      handleLogout
+      handleLogout,
+      t,
+      locale,
+      onLocaleChange,
+      collapsed,
+      toggleSidebar
     }
   }
 }
@@ -125,6 +252,8 @@ export default {
 .sidebar {
   background-color: #2c3e50;
   color: white;
+  transition: width 0.2s ease;
+  overflow: hidden;
 }
 
 .logo {
@@ -135,6 +264,7 @@ export default {
   font-weight: bold;
   color: white;
   border-bottom: 1px solid #34495e;
+  white-space: nowrap;
 }
 
 .admin-menu {
@@ -155,6 +285,16 @@ export default {
   align-items: center;
   height: 100%;
   padding: 0 20px;
+}
+
+.header-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collapse-btn {
+  color: #303133;
 }
 
 .header-title {

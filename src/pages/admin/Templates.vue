@@ -75,12 +75,14 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Designer Type</label>
-            <select v-model="newTemplate.designerType">
-              <option value="GENERIC_V1">GENERIC_V1</option>
-              <option value="ID_PHOTO_V1">ID_PHOTO_V1</option>
-              <option value="STYLE_PORTRAIT_V1">STYLE_PORTRAIT_V1</option>
+            <label>{{ t('templatesPage.designerType') }}</label>
+            <p v-if="!designerTypeOptions.length" class="field-hint warn">{{ t('templatesPage.noDesignerTypes') }}</p>
+            <select v-model="newTemplate.designerType" :disabled="!designerTypeOptions.length">
+              <option v-for="opt in designerTypeOptions" :key="opt.code" :value="opt.code">
+                {{ opt.code }} — {{ opt.name }}
+              </option>
             </select>
+            <p v-if="designerTypeOptions.length" class="field-hint">{{ t('templatesPage.designerTypeHint') }}</p>
           </div>
           <div class="form-actions">
             <button type="submit" :disabled="creating">Create</button>
@@ -93,13 +95,17 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getTemplates, createTemplate, deleteTemplate, restoreTemplate } from '../../api/admin'
+import { listTemplateTypes } from '../../api/adminTemplateTypes'
 
 export default {
   name: 'Templates',
   setup() {
+    const { t } = useI18n()
     const templates = ref([])
+    const designerTypeOptions = ref([])
     const loading = ref(false)
     const showCreateModal = ref(false)
     const creating = ref(false)
@@ -113,6 +119,36 @@ export default {
       type: 'IMAGE',
       designerType: 'GENERIC_V1',
       contentJson: '{}'
+    })
+
+    async function loadDesignerTypes() {
+      try {
+        const res = await listTemplateTypes({ enabledOnly: true })
+        if (!res?.data?.success || !Array.isArray(res.data.data)) {
+          designerTypeOptions.value = []
+          return
+        }
+        const list = [...res.data.data].sort(
+          (a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0)
+        )
+        designerTypeOptions.value = list
+        const codes = list.map((x) => x.code)
+        if (!codes.length) {
+          return
+        }
+        if (!codes.includes(newTemplate.value.designerType)) {
+          newTemplate.value.designerType = codes[0]
+        }
+      } catch (e) {
+        console.error('loadDesignerTypes failed', e)
+        designerTypeOptions.value = []
+      }
+    }
+
+    watch(showCreateModal, (open) => {
+      if (open) {
+        loadDesignerTypes()
+      }
     })
 
     const loadTemplates = async () => {
@@ -182,7 +218,15 @@ export default {
         const response = await createTemplate(newTemplate.value)
         if (response.data.success) {
           showCreateModal.value = false
-          newTemplate.value = { code: '', name: '', description: '', type: 'IMAGE', designerType: 'GENERIC_V1', contentJson: '{}' }
+          const firstCode = designerTypeOptions.value[0]?.code || 'GENERIC_V1'
+          newTemplate.value = {
+            code: '',
+            name: '',
+            description: '',
+            type: 'IMAGE',
+            designerType: firstCode,
+            contentJson: '{}'
+          }
           loadTemplates()
         }
       } catch (e) {
@@ -197,6 +241,7 @@ export default {
     })
 
     return {
+      t,
       templates,
       loading,
       showCreateModal,
@@ -205,6 +250,7 @@ export default {
       restoring,
       showDeleted,
       newTemplate,
+      designerTypeOptions,
       loadTemplates,
       handleCreate,
       handleDelete,
@@ -364,6 +410,16 @@ export default {
 .form-group label {
   display: block;
   margin-bottom: 0.5rem;
+}
+
+.field-hint {
+  font-size: 0.8rem;
+  color: #909399;
+  margin: 0.35rem 0 0.5rem;
+}
+
+.field-hint.warn {
+  color: #e6a23c;
 }
 
 .form-group input,
